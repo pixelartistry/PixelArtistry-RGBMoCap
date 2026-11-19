@@ -1,0 +1,22 @@
+# Created by the installer when you run it
+toyxyz_RGBMocap/
+gated_downloads/
+rgbmocap_main.zip
+install_log.txt
+Run_RGBMoCap.bat
+Update_RGBMoCap.bat
+
+# Notes, prompts and handoff files (never commit)
+notes/
+HANDOFF*
+handoff*
+CLAUDE.md
+.claude/
+
+# OS / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+__pycache__/
