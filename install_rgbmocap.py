@@ -37,10 +37,11 @@ LOG = os.path.join(ROOT, "install_log.txt")
 REPO_GIT = "https://github.com/toyxyz/toyxyz_RGBMocap.git"
 REPO_ZIP = "https://github.com/toyxyz/toyxyz_RGBMocap/archive/refs/heads/main.zip"
 ALL_TOOLS = ("exmr", "flowhmr", "gvhmr")
-TOOL_LABEL = {"exmr": "ExMR", "flowhmr": "FlowHMR", "gvhmr": "GVHMR"}
+TOOL_LABEL = {"exmr": "ExMR", "flowhmr": "FlowHMR", "gvhmr": "GVHMR", "gemx": "GEM-X"}
 RUNTIME_GIB = 33   # upstream asks for about 32.4 GiB free before the models
 MODELS_GIB = 30    # public + registered model files for ExMR, FlowHMR and GVHMR
-WORKER_PREFIX = "@@MOCAP@@"
+GEMX_GIB = 20      # 12 GiB working space for its setup + about 7 GiB of models
+EVENT_LINE = re.compile(r"^@@[A-Z_]+@@(\{.*)$")
 
 
 # ----------------------------------------------------------------------------
@@ -68,24 +69,57 @@ def clean_env():
     return env
 
 
+class Progress:
+    """Turns RGB MoCap's machine-readable progress lines into one tidy, updating line."""
+    def __init__(self):
+        self.last, self.message, self.error = 0.0, None, ""
+
+    def __call__(self, event):
+        kind, message = event.get("type"), str(event.get("message") or "")
+        if kind in ("failed", "error"):
+            self.error = message
+            clear_line()
+            log("    ! " + message)
+        elif kind == "progress" and event.get("total"):
+            now = time.monotonic()
+            if now - self.last < 1:
+                return
+            self.last = now
+            cur, total = event.get("current") or 0, event["total"]
+            amount = f"{cur / 1e9:.2f} / {total / 1e9:.2f} GB" if total > 5_000_000 else f"{cur} / {total}"
+            left = event.get("remaining_seconds")
+            eta = f"  about {left / 60:.0f} min left" if isinstance(left, (int, float)) and left > 90 else ""
+            sys.stdout.write(("\r    %5.1f%%  %s  %s%s" % (100 * cur / total, amount, message[:40], eta))[:110].ljust(110))
+            sys.stdout.flush()
+        elif message and message != self.message:
+            self.message = message
+            clear_line()
+            log("    " + message)
+
+
+def clear_line():
+    sys.stdout.write("\r" + " " * 112 + "\r")
+    sys.stdout.flush()
+
+
 def stream(cmd, cwd=None, on_event=None):
     """Run a command, show its output live, keep it in the log. Returns the exit code."""
     log("  > " + " ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=cwd, env=clean_env(), stdin=subprocess.DEVNULL,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     buf = b""
+    on_event = on_event or Progress()
 
     def handle(raw, transient):
         text = raw.decode("utf-8", "replace").rstrip()
         if not text:
             return
-        if text.startswith(WORKER_PREFIX):
+        marker = EVENT_LINE.match(text)
+        if marker:  # @@SETUP@@{...} / @@MOCAP@@{...}
             try:
-                event = json.loads(text[len(WORKER_PREFIX):])
+                on_event(json.loads(marker.group(1)))
             except ValueError:
-                return
-            if on_event:
-                on_event(event)
+                pass
             return
         if transient:  # progress bars: show, but keep them out of the log
             sys.stdout.write("\r    " + text[:100].ljust(100))
@@ -105,7 +139,9 @@ def stream(cmd, cwd=None, on_event=None):
             seg, sep, buf = buf[:m.start()], buf[m.start():m.end()], buf[m.end():]
             handle(seg, transient=(sep == b"\r" and not buf.startswith(b"\n")))
     handle(buf, False)
-    return proc.wait()
+    code = proc.wait()
+    clear_line()
+    return code
 
 
 def gib(n):
@@ -185,7 +221,61 @@ def download_repo():
 # ----------------------------------------------------------------------------
 # 3. Official base install
 # ----------------------------------------------------------------------------
+def sha256_of(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def prefetch_support():
+    """Fetch Blender + FFmpeg with Windows' own curl before the official installer runs.
+
+    Why: the official installer downloads them with Python. On many PCs Windows keeps an
+    old, expired Let's Encrypt certificate in its cache; Windows ignores it, Python does
+    not, and the Blender download dies with "certificate has expired". curl.exe uses
+    Windows' certificate check, so it works. Nothing is skipped: the files are checked
+    here against the size + SHA-256 pinned by RGB MoCap, and its installer checks again.
+    """
+    if os.path.exists(os.path.join(APP_DIR, "runtime_character", "blender.exe")):
+        return  # already installed
+    curl = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "curl.exe")
+    try:
+        with open(os.path.join(APP_DIR, "installer", "git-support-lock.json"), encoding="utf-8") as f:
+            lock = json.load(f)
+        with open(os.path.join(APP_DIR, "tools", "support_components.py"), encoding="utf-8") as f:
+            wanted = re.findall(r"download\(cache,\s*'([^']+)',\s*lock\['(\w+)'\]\)", f.read())
+    except (OSError, ValueError):
+        return
+    if not os.path.exists(curl) or not wanted:
+        return  # the official installer downloads them itself
+    cache = os.path.join(APP_DIR, ".setup", "bootstrap-git", "support-downloads")
+    os.makedirs(cache, exist_ok=True)
+    for name, key in wanted:
+        spec = lock.get(key) or {}
+        url, size, digest = spec.get("url", ""), spec.get("bytes"), spec.get("sha256")
+        if not url.startswith("https://") or not size or not digest:
+            continue
+        final = os.path.join(cache, name + ".zip")
+        if os.path.exists(final) and os.path.getsize(final) == size and sha256_of(final) == digest:
+            continue
+        part = final + ".curl"
+        log(f"  Downloading {name} ({size / 1e6:.0f} MB)")
+        code = stream([curl, "--location", "--fail", "--retry", "3", "--retry-delay", "5",
+                       "--continue-at", "-", "--output", part, url])
+        if code == 0 and os.path.getsize(part) == size and sha256_of(part) == digest:
+            os.replace(part, final)
+            log("    OK (size and SHA-256 match)")
+        else:
+            log("    Could not pre-download it - the official installer will try on its own.")
+            if os.path.exists(part) and os.path.getsize(part) >= size:
+                os.remove(part)  # complete but wrong: never keep it
+
+
 def base_install():
+    prefetch_support()
     powershell = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"),
                               "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
     # Same command as upstream's install.cmd, without its "press any key" pause.
@@ -221,6 +311,9 @@ need = lambda stages: {k for s in stages for k in STAGE_REQUIREMENTS.get(s, ())}
 tools = {}
 for name in sys.argv[2].split(","):
     tool = MOTION_TOOLS[name]
+    if name == "gemx":  # finds its one person on its own, needs only its nine files
+        tools[name] = dict(core=sorted(need(("gemx_assets",))), extra=[])
+        continue
     core = need((*tool.stages(), "people"))
     every = need((*tool.stages(refine=True, footmr=True, handflow=True), "people"))
     if name == "flowhmr":
@@ -246,25 +339,44 @@ def query_models(tools):
 
 def worker(stage, *extra):
     """RGB MoCap's own model worker: it verifies every file (size + SHA-256) before accepting it."""
-    state = {"last": 0.0, "error": ""}
-
-    def on_event(event):
-        kind = event.get("type")
-        if kind == "progress" and event.get("total"):
-            now = time.monotonic()
-            if now - state["last"] >= 1:
-                state["last"] = now
-                cur, total = event.get("current", 0), event["total"]
-                sys.stdout.write(f"\r    {100 * cur / total:5.1f}%  {cur / 1e9:.2f} / {total / 1e9:.2f} GB".ljust(60))
-                sys.stdout.flush()
-        elif kind in ("failed", "error"):
-            state["error"] = str(event.get("message", ""))
-            log("    ! " + state["error"])
-
     code = stream([app_python(), "-I", "-X", "utf8", os.path.join(APP_DIR, "worker_boot.py"), stage, *extra],
-                  cwd=APP_DIR, on_event=on_event)
-    sys.stdout.write("\r" + " " * 70 + "\r")
+                  cwd=APP_DIR)
     return code == 0
+
+
+# ----------------------------------------------------------------------------
+# Optional add-on: GEM-X
+# ----------------------------------------------------------------------------
+def gemx_installed():
+    return os.path.exists(os.path.join(APP_DIR, ".setup", "gemx-runtime.json"))
+
+
+def install_gemx():
+    """Same as upstream's Setup_GEMX.cmd. The terms question is asked by Install_GEMX.bat."""
+    if not os.path.exists(os.path.join(APP_DIR, "SETUP_RECEIPT.json")):
+        sys.exit("Install RGB MoCap first: run Install_RGBMoCap.bat, then start Install_GEMX.bat again.")
+    gpu = nvidia_gpu()
+    if gpu:
+        log(f"  GPU: {gpu[0]}, driver {gpu[2]}")
+        try:
+            if float(gpu[2].split(".")[0]) < 580:
+                log("  ! GEM-X needs NVIDIA driver 580 or newer. Update your driver if the setup fails.")
+        except ValueError:
+            pass
+    free = gib(shutil.disk_usage(ROOT).free)
+    log(f"  Free disk space: {free:.0f} GB (GEM-X needs about {GEMX_GIB} GB)")
+    if not gemx_installed() and free < 13:
+        sys.exit("Not enough free space: the GEM-X setup needs 12 GB of working space plus 7 GB for its models.")
+    log("  Close RGB MoCap if it is open. This downloads about 3 GB of packages.")
+    cmd = [app_python(), "-I", "-X", "utf8", "-B", os.path.join(APP_DIR, "tools", "setup_gemx.py")]
+    for attempt in (1, 2):
+        if stream(cmd, cwd=APP_DIR) == 0:
+            return
+        if attempt == 1:
+            log("\n  The GEM-X setup stopped. Finished downloads are kept - trying once more in 10 s ...")
+            time.sleep(10)
+    sys.exit("\nThe GEM-X setup failed. Scroll up for the message, or open install_log.txt.\n"
+             "RGB MoCap itself is not affected. You can start Install_GEMX.bat again.")
 
 
 def download_public(info):
@@ -421,7 +533,7 @@ def hf_download(m, token):
                     last = time.monotonic()
                     sys.stdout.write(f"\r    {100 * done / total:5.1f}%  {done / 1e9:.2f} / {total / 1e9:.2f} GB".ljust(60))
                     sys.stdout.flush()
-        sys.stdout.write("\r" + " " * 70 + "\r")
+        clear_line()
         os.replace(out + ".part", out)
         return out
     except urllib.error.HTTPError as e:
@@ -546,6 +658,7 @@ def main():
     parser.add_argument("--no-models", action="store_true", help="install the program without model files")
     parser.add_argument("--tools", default=",".join(ALL_TOOLS),
                         help="which motion models to prepare, e.g. exmr or exmr,flowhmr (default: all three)")
+    parser.add_argument("--gemx", action="store_true", help="add the optional GEM-X model (used by Install_GEMX.bat)")
     parser.add_argument("--skip-gpu-check", action="store_true")
     args = parser.parse_args()
     tools = [t.strip().lower() for t in args.tools.split(",") if t.strip()]
@@ -555,6 +668,14 @@ def main():
 
     log("\n" + "=" * 70)
     log("RGB MoCap - one-click installer (PixelArtistry)   " + time.strftime("%Y-%m-%d %H:%M"))
+    if args.gemx:
+        step("1/2 Installing the GEM-X add-on")
+        install_gemx()
+        info = query_models(["gemx"])
+        step("2/2 Downloading the GEM-X model files")
+        failed = download_public(info)
+        summary(query_models(["gemx"]), failed)
+        return
     if args.models_only:
         if not os.path.exists(app_python()):
             sys.exit("RGB MoCap is not installed yet. Run Install_RGBMoCap.bat first.")
@@ -571,6 +692,8 @@ def main():
     if args.no_models:
         log("\nProgram installed. Model files were skipped (--no-models).")
         return
+    if gemx_installed():  # keep the add-on's files complete too
+        tools.append("gemx")
     info = query_models(tools)
     step("4/5 Downloading the public model files")
     failed = download_public(info)

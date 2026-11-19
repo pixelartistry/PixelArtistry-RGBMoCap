@@ -76,6 +76,18 @@ These are toyxyz's own impressions, not benchmarks:
 | **FlowHMR** | Slower, best overall quality, fingers included. |
 | **GVHMR** | Less consistent, but sometimes better for unusual poses such as backflips. |
 
+### Optional: GEM-X, the model without a research-only licence
+
+ExMR, FlowHMR and GVHMR are for learning, hobby and research use (see [License](#license)). **GEM-X** by NVIDIA is the one motion model in RGB MoCap that does not depend on them or on the SMPL body models: its code is Apache-2.0, its model uses the NVIDIA Open Model License and its SOMA body model is Apache-2.0. It needs **no registration**.
+
+The trade-off, in toyxyz's words: fast, with relatively low overall motion quality. It captures one person from a fixed camera, in clips of up to 60 seconds.
+
+1. Install RGB MoCap first (steps above), and close the app.
+2. Double-click `Install_GEMX.bat`. It shows the links to the terms and asks you to confirm, then installs the add-on and its nine model files (about 10 GB in total, NVIDIA driver 580 or newer).
+3. Start RGB MoCap and pick **GEM-X** under **AI Motion Model**.
+
+Read the terms yourself before you rely on GEM-X for paid work. The person detector it uses has its own terms.
+
 ### Low VRAM
 
 Leave **Resource Mode** on *Automatic*. With little free VRAM it switches to the *Low Memory* path on its own, which moves work to the CPU: slower, more system RAM, same quality. toyxyz measured 5.68 → 3.87 GiB for ExMR and 6.10 → 2.77 GiB for FlowHMR on short clips. Those are measurements on one PC, not guaranteed minimums.
@@ -84,6 +96,7 @@ Leave **Resource Mode** on *Automatic*. With little free VRAM it switches to the
 
 - Checks for 64-bit Windows, an NVIDIA GPU and enough disk space before it downloads anything.
 - Downloads RGB MoCap (with git if you have it, otherwise as a ZIP).
+- Fetches Blender and FFmpeg with Windows' own `curl` and checks them against the size and SHA-256 that RGB MoCap pins. This avoids the "certificate has expired" error the official installer runs into on PCs where Windows still caches an old Let's Encrypt certificate.
 - Runs the official base install. It creates its own private Python runtimes plus Blender 4.5 and FFmpeg inside the `toyxyz_RGBMocap` folder. Nothing touches your system Python, ComfyUI or Blender.
 - Downloads all public model files for ExMR, FlowHMR and GVHMR through RGB MoCap's own downloader, which verifies each file's size and SHA-256.
 - Finds your registered files, unpacks the right file from each archive and imports it through RGB MoCap's own validated import.
@@ -96,7 +109,8 @@ Only want one model? Open a terminal in the folder and run `Install_RGBMoCap.bat
 
 - **A download failed with a Google Drive message:** some files sit on Google Drive, which has a daily limit per file. Run `Import_Models.bat` again later, or open **Model Manager** inside the app and use **Manual Download... → Import...** for that row.
 - **Updating:** close the app and run `Update_RGBMoCap.bat`. It needs [Git for Windows](https://git-scm.com/download/win) and only works if the installer downloaded RGB MoCap with git.
-- **Not installed by this installer:** the optional MAMMA (multi-camera), PromptHMR, GEM-X and SAM 3.1 add-ons. They have their own `Setup_*.cmd` files inside `toyxyz_RGBMocap`, and MAMMA and PromptHMR need Visual Studio build tools and the CUDA Toolkit. See the [upstream model guides](https://github.com/toyxyz/toyxyz_RGBMocap/blob/main/docs/models/README.md).
+- **Not installed by this installer:** the optional MAMMA (multi-camera), PromptHMR and SAM 3.1 add-ons. They have their own `Setup_*.cmd` files inside `toyxyz_RGBMocap`, and MAMMA and PromptHMR need Visual Studio build tools and the CUDA Toolkit. See the [upstream model guides](https://github.com/toyxyz/toyxyz_RGBMocap/blob/main/docs/models/README.md).
+- **Unreal Engine and MetaHuman:** RGB MoCap can stream motion straight onto a MetaHuman through Live Link. That needs Unreal Engine 5.7.4, Visual Studio 2022 with the C++ workload, `Setup_UnrealStream.cmd` inside `toyxyz_RGBMocap` and the MetaHuman Connect plugin. Follow the [upstream Unreal guide](https://github.com/toyxyz/toyxyz_RGBMocap/blob/main/docs/UNREAL_LIVE_LINK.md).
 - **Moving the folder:** move the whole folder including `toyxyz_RGBMocap`. The models live in `toyxyz_RGBMocap\models`.
 
 ## License
@@ -104,7 +118,7 @@ Only want one model? Open a terminal in the folder and run `Install_RGBMoCap.bat
 > [!IMPORTANT]
 > - **My files in this repo** (the installer scripts and this README): [MIT](LICENSE).
 > - **RGB MoCap** (the app code): MIT, by [toyxyz](https://github.com/toyxyz/toyxyz_RGBMocap).
-> - **The AI models and body models are not MIT.** GVHMR, ExMR and FootMR are for educational, research and nonprofit use. PromptHMR and MAMMA are non-commercial research only. SMPL, SMPL-X, SMPL-H and MANO have their own registered terms. Read [THIRD_PARTY_NOTICES.md](https://github.com/toyxyz/toyxyz_RGBMocap/blob/main/THIRD_PARTY_NOTICES.md) before you use the results in a commercial project. This is not legal advice.
+> - **The AI models and body models are not MIT.** GVHMR, ExMR and FootMR are for educational, research and nonprofit use. PromptHMR and MAMMA are non-commercial research only. SMPL, SMPL-X, SMPL-H and MANO have their own registered terms. The optional GEM-X add-on is the exception described [above](#optional-gem-x-the-model-without-a-research-only-licence). Read [THIRD_PARTY_NOTICES.md](https://github.com/toyxyz/toyxyz_RGBMocap/blob/main/THIRD_PARTY_NOTICES.md) before you use the results in a commercial project. This is not legal advice.
 
 ## Credits
 
