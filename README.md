@@ -8,7 +8,7 @@ This repo does not contain RGB MoCap. It is a small installer that sets everythi
 
 - Windows 10/11, 64-bit
 - An NVIDIA GPU with a current driver (no AMD, no Mac, no Linux - that is an upstream limit)
-- About **65 GB** of free disk space
+- About **65 GB** of free disk space, ideally on an SSD
 - Three free accounts for the registered model files (see [step 2](#2-get-the-registered-files))
 
 ## Install
@@ -40,6 +40,8 @@ A few files belong to research institutes that only hand them out after you sign
 
 1. Put the downloaded files into the `gated_downloads` folder next to the installer. You can also just leave them in your Windows Downloads folder. **Do not unpack the ZIP and TAR.XZ files**, the importer takes out what it needs.
 2. Double-click `Import_Models.bat`.
+
+Keeping the files in another folder? Drag that folder onto `Import_Models.bat` instead. Sub-folders are searched too.
 
 The importer checks every file. A wrong version is rejected with a message instead of breaking the app. You can run it as often as you like, for example once per file as your access requests come through.
 
@@ -111,7 +113,8 @@ Only want one model? Open a terminal in the folder and run `Install_RGBMoCap.bat
 - **Updating:** close the app and run `Update_RGBMoCap.bat`. It needs [Git for Windows](https://git-scm.com/download/win) and only works if the installer downloaded RGB MoCap with git.
 - **Not installed by this installer:** the optional MAMMA (multi-camera), PromptHMR and SAM 3.1 add-ons. They have their own `Setup_*.cmd` files inside `toyxyz_RGBMocap`, and MAMMA and PromptHMR need Visual Studio build tools and the CUDA Toolkit. See the [upstream model guides](https://github.com/toyxyz/toyxyz_RGBMocap/blob/main/docs/models/README.md).
 - **Unreal Engine and MetaHuman:** RGB MoCap can stream motion straight onto a MetaHuman through Live Link. That needs Unreal Engine 5.7.4, Visual Studio 2022 with the C++ workload, `Setup_UnrealStream.cmd` inside `toyxyz_RGBMocap` and the MetaHuman Connect plugin. Follow the [upstream Unreal guide](https://github.com/toyxyz/toyxyz_RGBMocap/blob/main/docs/UNREAL_LIVE_LINK.md).
-- **Moving the folder:** move the whole folder including `toyxyz_RGBMocap`. The models live in `toyxyz_RGBMocap\models`.
+- **Use an SSD.** The install writes tens of thousands of small files. On an external or older hard drive that step alone can take hours, and every model load in the app is slow afterwards.
+- **Moving to another drive:** do not move the installed folder. Run the installer in the new place, then copy the whole `toyxyz_RGBMocap\models` folder across (it holds the downloaded and imported model files) and run `Import_Models.bat` once to re-check them.
 
 ## License
 

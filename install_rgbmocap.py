@@ -420,8 +420,11 @@ def name_matches(filename, wanted):
     return re.fullmatch(re.escape(stem) + r"( \(\d+\))?" + re.escape(ext), filename, re.I) is not None
 
 
+EXTRA_DIRS = []  # folders given on the command line or dropped onto Import_Models.bat
+
+
 def search_dirs():
-    dirs = [(GATED_DIR, True)]  # (folder, also look into sub-folders)
+    dirs = [(d, True) for d in EXTRA_DIRS] + [(GATED_DIR, True)]  # (folder, also look into sub-folders)
     downloads = os.path.join(os.path.expanduser("~"), "Downloads")
     if os.path.isdir(downloads):
         dirs.append((downloads, False))
@@ -647,6 +650,7 @@ def summary(info, failed_public):
                     log(f"      {line}")
         log(f"\n  Put the files into:  {GATED_DIR}")
         log("  (or just leave them in your Downloads folder) and double-click Import_Models.bat.")
+        log("  Files somewhere else? Drag that folder onto Import_Models.bat.")
         log("  ZIP and TAR.XZ files can stay packed - the importer takes out what it needs.")
     else:
         log("\n  Everything is in place. Double-click Run_RGBMoCap.bat to start.")
@@ -660,7 +664,16 @@ def main():
                         help="which motion models to prepare, e.g. exmr or exmr,flowhmr (default: all three)")
     parser.add_argument("--gemx", action="store_true", help="add the optional GEM-X model (used by Install_GEMX.bat)")
     parser.add_argument("--skip-gpu-check", action="store_true")
+    parser.add_argument("folders", nargs="*", help="extra folders that hold your registered model files")
     args = parser.parse_args()
+    for folder in args.folders:
+        folder = os.path.abspath(folder.strip('"'))
+        if os.path.isfile(folder):  # a file was dropped: use the folder it is in
+            folder = os.path.dirname(folder)
+        if os.path.isdir(folder):
+            EXTRA_DIRS.append(folder)
+        else:
+            sys.exit(f"Folder not found: {folder}")
     tools = [t.strip().lower() for t in args.tools.split(",") if t.strip()]
     unknown = [t for t in tools if t not in ALL_TOOLS]
     if unknown or not tools:
