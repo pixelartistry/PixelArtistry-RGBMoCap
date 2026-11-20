@@ -6,7 +6,7 @@ What it does
   1. Checks your PC (64-bit Windows, NVIDIA GPU, free disk space)
   2. Downloads RGB MoCap by toyxyz (with git if you have it, otherwise as a ZIP)
   3. Runs the official base install (private Python runtimes, Blender, FFmpeg)
-  4. Downloads every model file that is public (about 25 GB)
+  4. Downloads every model file that is public (about 18 GB)
   5. Imports the files you had to register for (SMPL-X, MANO, SAM 3D Body ...)
      from the "gated_downloads" folder or your Downloads folder
   6. Writes the "Run_RGBMoCap" and "Update_RGBMoCap" launchers
@@ -379,6 +379,35 @@ def install_gemx():
              "RGB MoCap itself is not affected. You can start Install_GEMX.bat again.")
 
 
+# RGB MoCap fetches these two only from Google Drive, which blocks a file for a day once
+# too many people have downloaded it. Same files from their authors' own release pages;
+# RGB MoCap's import still checks the SHA-256, so a different file cannot slip in.
+SECOND_SOURCE = {
+    "yolo": "https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8x.pt",
+    "person_reid": "https://huggingface.co/kaiyangzhou/osnet/resolve/main/osnet_x0_25_msmt17_combineall_"
+                   "256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip_jitter.pth",
+}
+
+
+def second_source(m):
+    url = SECOND_SOURCE.get(m["key"])
+    curl = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "curl.exe")
+    if not url or not os.path.exists(curl):
+        return False
+    log("    Google Drive did not deliver it - using the author's own download instead.")
+    folder = os.path.join(GATED_DIR, "_second_source")
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, m["file"])
+    if stream([curl, "--location", "--fail", "--retry", "3", "--retry-delay", "5", "--output", path, url]) != 0:
+        return False
+    ok = worker("import_model", "--model", m["key"], "--video", path)
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+    return ok
+
+
 def download_public(info):
     todo = [m for m in info["models"] if m["public"] and not m["ready"]]
     if not todo:
@@ -389,7 +418,7 @@ def download_public(info):
     failed = []
     for i, m in enumerate(todo, 1):
         log(f"\n  [{i}/{len(todo)}] {m['name']}  ({m['bytes'] / 1e9:.2f} GB)")
-        ok = worker("download", "--model", m["key"])
+        ok = worker("download", "--model", m["key"]) or second_source(m)
         if not ok:  # one retry: most failures are a dropped connection
             log("    Retrying once ...")
             time.sleep(5)
@@ -553,7 +582,6 @@ def import_gated(info):
     todo = [m for m in info["models"] if not m["public"] and not m["ready"] and m["key"] in GATED]
     if not todo:
         log("  All registered model files are already imported.")
-        return
     os.makedirs(GATED_DIR, exist_ok=True)
     token = hf_token()
     for m in todo:
@@ -570,6 +598,10 @@ def import_gated(info):
             path = hf_download(m, token)
             if path and worker("import_model", "--model", m["key"], "--video", path):
                 log("    Imported.")
+    # The app keeps its own verified copy in toyxyz_RGBMocap\models. Remove only the
+    # working copies this installer made itself - never the files the user downloaded.
+    for name in ("_extracted", "hf", "_second_source"):
+        shutil.rmtree(os.path.join(GATED_DIR, name), ignore_errors=True)
 
 
 # ----------------------------------------------------------------------------
@@ -578,13 +610,15 @@ def import_gated(info):
 def write_launchers():
     files = {
         "Run_RGBMoCap.bat":
+            # Full paths on purpose: some PCs are set up so that cmd does not look for
+            # scripts in the current folder (NoDefaultCurrentDirectoryInExePath).
             '@echo off\r\ntitle RGB MoCap\r\ncd /d "%~dp0toyxyz_RGBMocap"\r\n'
             'echo Starting RGB MoCap - keep this window open while you use the app.\r\n'
-            'call RGBMoCap.cmd %*\r\n',
+            'call "%~dp0toyxyz_RGBMocap\\RGBMoCap.cmd" %*\r\n',
         "Update_RGBMoCap.bat":
             '@echo off\r\ntitle RGB MoCap - Update\r\ncd /d "%~dp0toyxyz_RGBMocap"\r\n'
             'echo Close RGB MoCap before updating.\r\n'
-            'call update.cmd %*\r\n',
+            'call "%~dp0toyxyz_RGBMocap\\update.cmd" %*\r\n',
     }
     for name, text in files.items():
         with open(os.path.join(ROOT, name), "w", encoding="utf-8", newline="") as f:

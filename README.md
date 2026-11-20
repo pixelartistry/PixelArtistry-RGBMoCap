@@ -2,7 +2,7 @@
 
 Runs [RGB MoCap](https://github.com/toyxyz/toyxyz_RGBMocap) by toyxyz locally on your own PC: **a normal video in, 3D motion capture out.** No suit, no trackers, no subscription. It tracks one or several people, locks the feet to the ground, retargets the motion onto your own character (Mixamo FBX, VRM, PMX) and exports FBX, BVH or a Blender project.
 
-This repo does not contain RGB MoCap. It is a small installer that sets everything up for you, downloads the ~25 GB of public model files, and imports the few files you have to register for.
+This repo does not contain RGB MoCap. It is a small installer that sets everything up for you, downloads the ~18 GB of public model files, and imports the few files you have to register for.
 
 ## What you need
 
@@ -17,7 +17,7 @@ This repo does not contain RGB MoCap. It is a small installer that sets everythi
 
 1. On this page: **Code → Download ZIP**, and unzip it on a drive with 65 GB free. Use a short path such as `D:\AI\RGBMoCap`.
 2. Double-click `Install_RGBMoCap.bat`.
-3. Let it run. It downloads about 33 GB and needs no input. How long it takes depends on your internet connection.
+3. Let it run. It downloads about 26 GB and needs no input. How long it takes depends on your internet connection.
 
 At the end it prints a **Result** list that tells you which motion models are ready and which files are still missing.
 
@@ -109,7 +109,7 @@ Only want one model? Open a terminal in the folder and run `Install_RGBMoCap.bat
 
 ## Notes
 
-- **A download failed with a Google Drive message:** some files sit on Google Drive, which has a daily limit per file. Run `Import_Models.bat` again later, or open **Model Manager** inside the app and use **Manual Download... → Import...** for that row.
+- **Google Drive limits:** upstream keeps a few files on Google Drive, which blocks a file for a day once too many people have downloaded it. For the two files every model needs (the YOLO person detector and the OSNet identity model) the installer switches to the authors' own release pages automatically. `pvanet.pt` (3 GB) has no other source. It is only an optional refinement step for GVHMR, so everything works without it; run `Import_Models.bat` again another day to get it.
 - **Updating:** close the app and run `Update_RGBMoCap.bat`. It needs [Git for Windows](https://git-scm.com/download/win) and only works if the installer downloaded RGB MoCap with git.
 - **Not installed by this installer:** the optional MAMMA (multi-camera), PromptHMR and SAM 3.1 add-ons. They have their own `Setup_*.cmd` files inside `toyxyz_RGBMocap`, and MAMMA and PromptHMR need Visual Studio build tools and the CUDA Toolkit. See the [upstream model guides](https://github.com/toyxyz/toyxyz_RGBMocap/blob/main/docs/models/README.md).
 - **Unreal Engine and MetaHuman:** RGB MoCap can stream motion straight onto a MetaHuman through Live Link. That needs Unreal Engine 5.7.4, Visual Studio 2022 with the C++ workload, `Setup_UnrealStream.cmd` inside `toyxyz_RGBMocap` and the MetaHuman Connect plugin. Follow the [upstream Unreal guide](https://github.com/toyxyz/toyxyz_RGBMocap/blob/main/docs/UNREAL_LIVE_LINK.md).
