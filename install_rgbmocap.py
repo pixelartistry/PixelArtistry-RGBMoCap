@@ -665,6 +665,8 @@ def summary(info, failed_public):
         else:
             line = "needs " + ", ".join(m["file"] for m in missing)
         log(f"  {TOOL_LABEL.get(name, name):8} {line}")
+        if name == "gvhmr" and not missing and any(m["key"] == "pva" for m in extra):
+            log("           Without pvanet.pt: untick \"HTD Refine\" in the GVHMR settings before Reconstruct 3D.")
 
     if failed_public:
         log("\n  These public downloads failed (often Google Drive's daily limit):")
