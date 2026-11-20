@@ -43,6 +43,22 @@ def main(files):
     if not 1 <= len(files) <= 2:
         raise SystemExit("FIX: drop the rigged Mixamo FBX (and optionally the file you uploaded) onto the .bat.")
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    if len(files) == 1:
+        # Mixamo keeps the path of the textures of the file that was uploaded, e.g.
+        # "...\my_character.fbm". If "...\my_character.fbx" (or .glb) is still there, use it.
+        objs = load(files[0])
+        for im in bpy.data.images:
+            p = bpy.path.abspath(im.filepath) if im.filepath else ""
+            if not im.packed_file and p.lower().endswith(".fbm"):
+                for ext in (".fbx", ".glb", ".gltf"):
+                    cand = p[:-4] + ext
+                    if os.path.isfile(cand) and os.path.abspath(cand) != os.path.abspath(files[0]):
+                        print(f"FIX: found the file you uploaded to Mixamo: {cand}")
+                        files = files + [cand]
+                        break
+                if len(files) == 2:
+                    break
+        bpy.ops.wm.read_factory_settings(use_empty=True)
     loaded = []
     for f in files:
         objs = load(f)

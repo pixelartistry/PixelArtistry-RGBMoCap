@@ -68,7 +68,7 @@ Double-click `Run_RGBMoCap.bat`. Keep the black console window open while you us
 
 Custom bone mapping is not available yet, so a character from another tool has to go through the Mixamo auto-rigger first (upload it at [mixamo.com](https://www.mixamo.com), download it as FBX in T-pose with skin).
 
-**Import fails with "Unable to pack file ... .fbm not found"?** Mixamo often embeds only some of a character's textures and leaves the others as links to a folder on its own server. Drag the FBX you downloaded from Mixamo onto `Fix_Mixamo_Character.bat`, ideally together with the file you uploaded to Mixamo (select both, then drag). It puts the original textures back, embeds them, saves `<name>_fixed.fbx` next to the Mixamo file and checks it with RGB MoCap's own import. Without the upload file it still works, but keeps only the textures Mixamo embedded (usually just the colour map). The rig and mesh are not changed.
+**Import fails with "Unable to pack file ... .fbm not found"?** Mixamo often embeds only some of a character's textures and leaves the others as links to a folder on its own server. Drag the FBX you downloaded from Mixamo onto `Fix_Mixamo_Character.bat`. If the file you uploaded to Mixamo is still where it was, the fix finds it on its own; otherwise select both files and drag them together. It puts the original textures back, embeds them, saves `<name>_fixed.fbx` next to the Mixamo file and checks it with RGB MoCap's own import. Without the upload file it still works, but keeps only the textures Mixamo embedded (usually just the colour map). The rig and mesh are not changed.
 
 ### Which model?
 
