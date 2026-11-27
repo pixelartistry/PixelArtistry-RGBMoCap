@@ -134,4 +134,4 @@ All credit for RGB MoCap goes to [toyxyz](https://github.com/toyxyz/toyxyz_RGBMo
 ## PixelArtistry
 
 - YouTube: [youtube.com/@PixelArtistry_](https://www.youtube.com/@PixelArtistry_)
-- FutureFrames newsletter: [go.pixel-artistry.com/newsletter](https://go.pixel-artistry.com/newsletter)
+- FutureFrames newsletter: [pixel-artistry.com/newsletter](https://pixel-artistry.com/newsletter)
